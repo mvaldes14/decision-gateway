@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: decision-gateway-definitions
+data:
+  task-triage.yaml: |
+    apiVersion: decisiongateway.dev/v1alpha1
+    kind: Decision
+    metadata:
+      name: task-triage
+      version: v1
+    spec:
+      description: Classify engineering tasks and estimate effort
+      input:
+        type: object
+        additionalProperties: false
+        required: [title, description]
+        properties:
+          title: {type: string, minLength: 1, maxLength: 300}
+          description: {type: string, minLength: 1, maxLength: 10000}
+      decisions:
+        project:
+          type: choice
+          instruction: Select the most appropriate owning project.
+          options:
+            platform: Kubernetes, networking, and shared infrastructure
+            observability: Metrics, logs, traces, and telemetry pipelines
+            application: Application and product functionality
+        effort:
+          type: choice
+          instruction: Estimate relative effort using the team's story-point rubric.
+          options:
+            "1": Trivial, low risk
+            "2": Small, well understood
+            "3": Moderate, localized change
+            "5": Multi-step change with uncertainty
+            "8": Significant cross-component change
+            "13": Large or insufficiently decomposed task
+      routing:
+        primary: laya
+        fallback: clef
+        timeout: 5s
+      review:
+        enabled: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: decision-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: decision-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: decision-gateway
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: decision-gateway
+          image: ghcr.io/mvaldes14/decision-gateway:latest
+          env:
+            - name: DG_DEFINITIONS_DIR
+              value: /etc/decision-gateway/decisions
+            - name: DG_CLEF_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: decision-gateway-providers
+                  key: clef-api-key
+                  optional: true
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: definitions
+              mountPath: /etc/decision-gateway/decisions
+              readOnly: true
+      volumes:
+        - name: definitions
+          configMap:
+            name: decision-gateway-definitions
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: decision-gateway
+spec:
+  selector:
+    app.kubernetes.io/name: decision-gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

@@ -1,0 +1,15 @@
+services:
+  decision-gateway:
+    build: .
+    environment:
+      DG_LISTEN_ADDR: :8080
+      DG_DEFINITIONS_DIR: /etc/decision-gateway/decisions
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./decisions:/etc/decision-gateway/decisions:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
