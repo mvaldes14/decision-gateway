@@ -9,4 +9,4 @@ resources:
 
 images:
   - name: ghcr.io/mvaldes14/decision-gateway
-    newTag: v0.1.1
+    newTag: v0.2.0
