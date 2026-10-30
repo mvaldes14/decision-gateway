@@ -3,6 +3,7 @@ name: release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -77,13 +78,13 @@ jobs:
     permissions:
       contents: read
       packages: write
-    uses: mvaldes14/gh-actions/.github/workflows/docker-multiarch.yml@main
+    uses: mvaldes14/gh-actions/.github/workflows/docker-build-push.yml@main
     with:
       image: mvaldes14/decision-gateway
-      platforms: '["linux/amd64","linux/arm64"]'
+      platforms: linux/amd64
       tags: |
-        type=semver,pattern={{version}}
-        type=semver,pattern={{major}}.{{minor}}
+        type=semver,pattern=v{{version}}
+        type=semver,pattern=v{{major}}.{{minor}}
         type=raw,value=latest
       build-args: |
         VERSION=${{ github.ref_name }}
