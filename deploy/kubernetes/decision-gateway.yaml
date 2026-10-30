@@ -67,6 +67,18 @@ spec:
           env:
             - name: DG_DEFINITIONS_DIR
               value: /etc/decision-gateway/decisions
+            - name: DG_LAYA_BASE_URL
+              value: http://laya:8000
+            - name: DG_LAYA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: decision-gateway-providers
+                  key: laya-api-key
+                  optional: true
+            - name: DG_CLEF_BASE_URL
+              value: http://ollama:11434
+            - name: DG_CLEF_MODEL
+              value: clef
             - name: DG_CLEF_API_KEY
               valueFrom:
                 secretKeyRef:

@@ -11,6 +11,12 @@ type Config struct {
 	DefinitionsDir string
 	MaxBodyBytes   int64
 	MaxConcurrent  int
+	LayaBaseURL    string
+	LayaAPIKey     string
+	LayaModel      string
+	ClefBaseURL    string
+	ClefAPIKey     string
+	ClefModel      string
 }
 
 func Load() (Config, error) {
@@ -19,6 +25,12 @@ func Load() (Config, error) {
 		DefinitionsDir: envOrDefault("DG_DEFINITIONS_DIR", "./decisions"),
 		MaxBodyBytes:   1 << 20,
 		MaxConcurrent:  64,
+		LayaBaseURL:    os.Getenv("DG_LAYA_BASE_URL"),
+		LayaAPIKey:     os.Getenv("DG_LAYA_API_KEY"),
+		LayaModel:      os.Getenv("DG_LAYA_MODEL"),
+		ClefBaseURL:    os.Getenv("DG_CLEF_BASE_URL"),
+		ClefAPIKey:     os.Getenv("DG_CLEF_API_KEY"),
+		ClefModel:      envOrDefault("DG_CLEF_MODEL", "clef"),
 	}
 
 	if value := os.Getenv("DG_MAX_BODY_BYTES"); value != "" {

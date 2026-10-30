@@ -35,7 +35,11 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 
-	providers := provider.NewSet() // Real adapters added after protocol validation (M0).
+	configuredProviders, err := buildProviders(cfg)
+	if err != nil {
+		return err
+	}
+	providers := provider.NewSet(configuredProviders...)
 	executionEngine := engine.New(providers)
 	handler := api.New(definitions, executionEngine, cfg.MaxBodyBytes, cfg.MaxConcurrent, logger)
 	server := &http.Server{
@@ -57,9 +61,36 @@ func run(logger *slog.Logger) error {
 		}
 	}()
 
-	logger.Info("starting decision gateway", "address", cfg.ListenAddr, "definitions", cfg.DefinitionsDir)
+	logger.Info("starting decision gateway", "address", cfg.ListenAddr, "definitions", cfg.DefinitionsDir, "providers", providerNames(configuredProviders))
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
 	return nil
+}
+
+func buildProviders(cfg config.Config) ([]provider.Provider, error) {
+	providers := make([]provider.Provider, 0, 2)
+	configs := []provider.SystemOneConfig{
+		{Name: "laya", BaseURL: cfg.LayaBaseURL, APIKey: cfg.LayaAPIKey, Model: cfg.LayaModel},
+		{Name: "clef", BaseURL: cfg.ClefBaseURL, APIKey: cfg.ClefAPIKey, Model: cfg.ClefModel},
+	}
+	for _, item := range configs {
+		if item.BaseURL == "" {
+			continue
+		}
+		adapter, err := provider.NewSystemOne(item)
+		if err != nil {
+			return nil, err
+		}
+		providers = append(providers, adapter)
+	}
+	return providers, nil
+}
+
+func providerNames(providers []provider.Provider) []string {
+	names := make([]string, 0, len(providers))
+	for _, item := range providers {
+		names = append(names, item.Name())
+	}
+	return names
 }

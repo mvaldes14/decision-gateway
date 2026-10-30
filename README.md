@@ -2,7 +2,7 @@
 
 Self-hosted service exposing reusable, versioned decision contracts through provider-independent REST APIs.
 
-> Status: scaffold. Registry, schema validation, discovery API, execution engine, fallback, container, and Kubernetes baseline exist. Laya/CLEF adapters and OpenTelemetry remain gated on provider protocol validation.
+> Status: early integration. Registry, validation, discovery, execution, fallback, and System One adapters for Laya and Ollama-hosted Clef exist. OpenTelemetry and release hardening remain.
 
 ## Run
 
@@ -18,14 +18,28 @@ curl -s http://localhost:8080/v1/decisions
 curl -s http://localhost:8080/v1/decisions/task-triage/versions/v1
 ```
 
-Execution currently returns `PROVIDER_ERROR` because real adapters are intentionally not stubbed with unverified protocols.
+Configure at least one provider, then execute a decision:
+
+```sh
+# Self-hosted Laya. Add DG_LAYA_API_KEY when LAYA_API_KEY is enabled.
+export DG_LAYA_BASE_URL=http://localhost:8000
+
+# Optional fallback through local Ollama. Use https://ollama.com plus
+# DG_CLEF_API_KEY for Ollama cloud.
+export DG_CLEF_BASE_URL=http://localhost:11434
+export DG_CLEF_MODEL=clef
+
+go run ./cmd/decision-gateway
+```
 
 ```sh
 curl -sS -X POST \
   http://localhost:8080/v1/decisions/task-triage/versions/v1:execute \
   -H 'content-type: application/json' \
-  -d '{"title":"Add distributed tracing","description":"Instrument the API gateway with OpenTelemetry"}'
+  -d '{"title":"Add distributed tracing","description":"Instrument the API gateway with OpenTelemetry"}' | jq
 ```
+
+Both adapters call `POST /v1/systemone`. Laya may omit `model`; Ollama requires a decision model such as `clef`, `clef-flash`, or a cloud model reference.
 
 ## Configuration
 
@@ -35,8 +49,14 @@ curl -sS -X POST \
 | `DG_DEFINITIONS_DIR` | `./decisions` | startup-loaded YAML definitions |
 | `DG_MAX_BODY_BYTES` | `1048576` | request body limit |
 | `DG_MAX_CONCURRENT` | `64` | concurrent execution limit |
+| `DG_LAYA_BASE_URL` | empty | Laya server root URL |
+| `DG_LAYA_API_KEY` | empty | optional Laya bearer token |
+| `DG_LAYA_MODEL` | empty | optional Laya model override |
+| `DG_CLEF_BASE_URL` | empty | Ollama server root URL or `https://ollama.com` |
+| `DG_CLEF_API_KEY` | empty | optional Ollama bearer token |
+| `DG_CLEF_MODEL` | `clef` | Ollama decision model |
 
-Provider and standard `OTEL_*` variables are reserved in `.env.example`; code will consume them when adapters and telemetry land.
+A provider is registered only when its base URL is configured. Standard `OTEL_*` variables remain reserved for telemetry.
 
 ## Layout
 
@@ -46,7 +66,7 @@ internal/api/          REST API and error envelope
 internal/config/       environment configuration
 internal/definition/   contract types and supported schema subset
 internal/engine/       timeout, fallback, output normalization
-internal/provider/     provider interface and registry
+internal/provider/     provider interface, registry, System One adapter
 internal/registry/     immutable startup registry
 decisions/             example contracts
 deploy/kubernetes/     baseline manifests
@@ -63,11 +83,11 @@ docker compose up --build
 
 ## Milestones
 
-- **M0:** verify Laya/CLEF protocols and capture fixtures
-- **M1:** contract and registry
-- **M2:** execution API, request IDs, deadlines, mock-provider integration tests
-- **M3:** real adapters and typed provider errors
-- **M4:** OpenTelemetry, release hardening, n8n example
+- **M0:** complete — verified System One protocol for Laya and Ollama-hosted Clef
+- **M1:** complete — contract, registry, validation, and discovery
+- **M2:** complete — execution API, request IDs, deadlines, fallback, and mock tests
+- **M3:** in progress — live System One adapters implemented; real endpoint testing and typed provider errors remain
+- **M4:** OpenTelemetry, release hardening, and n8n example
 
 ## License
 

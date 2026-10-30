@@ -4,6 +4,12 @@ services:
     environment:
       DG_LISTEN_ADDR: :8080
       DG_DEFINITIONS_DIR: /etc/decision-gateway/decisions
+      DG_LAYA_BASE_URL: ${DG_LAYA_BASE_URL:-}
+      DG_LAYA_API_KEY: ${DG_LAYA_API_KEY:-}
+      DG_LAYA_MODEL: ${DG_LAYA_MODEL:-}
+      DG_CLEF_BASE_URL: ${DG_CLEF_BASE_URL:-}
+      DG_CLEF_API_KEY: ${DG_CLEF_API_KEY:-}
+      DG_CLEF_MODEL: ${DG_CLEF_MODEL:-clef}
     ports:
       - "127.0.0.1:8080:8080"
     volumes:

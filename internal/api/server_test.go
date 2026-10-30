@@ -72,3 +72,41 @@ func TestEndpoints(t *testing.T) {
 		})
 	}
 }
+
+func TestExecuteWithSystemOneProvider(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/systemone" {
+			t.Fatalf("upstream path = %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"answers":{"label":{"type":"choice","choice":"yes","probabilities":{"yes":0.95,"no":0.05}}}}`))
+	}))
+	defer upstream.Close()
+
+	directory := t.TempDir()
+	definition := strings.Replace(testDefinition, "primary: missing", "primary: laya", 1)
+	if err := os.WriteFile(filepath.Join(directory, "test.yaml"), []byte(definition), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	definitions, err := registry.Load(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter, err := provider.NewSystemOne(provider.SystemOneConfig{Name: "laya", BaseURL: upstream.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := New(definitions, engine.New(provider.NewSet(adapter)), 1024, 1, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	request := httptest.NewRequest(http.MethodPost, "/v1/decisions/test/versions/v1:execute", strings.NewReader(`{"message":"hello"}`))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	for _, expected := range []string{`"choice":"yes"`, `"provider":"laya"`, `"yes":0.95`} {
+		if !strings.Contains(response.Body.String(), expected) {
+			t.Fatalf("body = %s; missing %s", response.Body.String(), expected)
+		}
+	}
+}
