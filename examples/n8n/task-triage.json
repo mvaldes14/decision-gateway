@@ -1,0 +1,100 @@
+{
+  "name": "Decision Gateway - Task Triage",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6a9e7a7e-31dd-4d14-98f6-c6a717f32f55",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ce182282-ae75-4674-ad39-a9b61a2d98e7",
+              "name": "title",
+              "value": "Add distributed tracing",
+              "type": "string"
+            },
+            {
+              "id": "06942a85-6e82-45dd-a11d-d522d801ec1e",
+              "name": "description",
+              "value": "Instrument the API gateway with OpenTelemetry",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ec9a0b80-e009-4090-b694-4e8a047bb24a",
+      "name": "Task Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://decision-gateway:8080/v1/decisions/task-triage/versions/v1:execute",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "480102cc-4397-4335-9cea-7882cc0bd304",
+      "name": "Execute Decision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 300]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Task Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Task Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "7e26b93b-4910-4201-9c10-e27e9cebe48f",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

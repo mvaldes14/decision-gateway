@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">Decision Gateway</title>
+  <desc id="desc">An input passes through a decision diamond and branches to three outputs.</desc>
+  <defs>
+    <linearGradient id="gateway" x1="24" y1="20" x2="138" y2="140" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#0F172A" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="144" height="144" rx="34" fill="#0F172A"/>
+  <path d="M28 80h28" fill="none" stroke="#E2E8F0" stroke-width="8" stroke-linecap="round"/>
+  <path d="M104 80h12c10 0 18-8 18-18V46M104 80h30M104 80h12c10 0 18 8 18 18v16" fill="none" stroke="#E2E8F0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="27" cy="80" r="11" fill="#38BDF8"/>
+  <rect x="58" y="52" width="56" height="56" rx="10" transform="rotate(45 86 80)" fill="url(#gateway)" filter="url(#shadow)"/>
+  <path d="m76 80 7 7 15-16" fill="none" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="134" cy="40" r="10" fill="#A78BFA"/>
+  <circle cx="134" cy="80" r="10" fill="#818CF8"/>
+  <circle cx="134" cy="120" r="10" fill="#38BDF8"/>
+</svg>

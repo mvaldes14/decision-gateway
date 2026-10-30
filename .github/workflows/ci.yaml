@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    permissions:
+      contents: read
+    uses: mvaldes14/gh-actions/.github/workflows/go-ci.yml@main
+    with:
+      lint: false
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+      - run: kubectl kustomize deploy/kubernetes >/dev/null
+
+  container:
+    permissions:
+      contents: read
+      packages: write
+    uses: mvaldes14/gh-actions/.github/workflows/docker-build-push.yml@main
+    with:
+      image: mvaldes14/decision-gateway
+      push: false
+      cache-scope: decision-gateway-ci
