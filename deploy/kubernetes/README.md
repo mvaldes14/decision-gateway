@@ -63,7 +63,7 @@ For GitOps, override the image in an overlay instead of modifying the base.
 
 ## Adding decisions
 
-Add each definition as another key in `configmap.yaml`. The key becomes the mounted filename; `metadata.name` and `metadata.version` determine the generated REST endpoints.
+Add each definition as another key in `configmap.yaml`. The key becomes the mounted filename; `metadata.name` and `metadata.version` determine the generated REST endpoints. Embedded definitions use `schemaVersion`; they are application config, not Kubernetes resources or CRDs.
 
 The registry loads definitions at startup, so restart the Deployment after ConfigMap changes:
 

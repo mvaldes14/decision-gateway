@@ -15,8 +15,7 @@ import (
 	"github.com/mvaldes14/decision-gateway/internal/registry"
 )
 
-const testDefinition = `apiVersion: decisiongateway.dev/v1alpha1
-kind: Decision
+const testDefinition = `schemaVersion: v1alpha1
 metadata: {name: test, version: v1}
 spec:
   description: test

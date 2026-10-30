@@ -7,16 +7,12 @@ import (
 	"time"
 )
 
-const (
-	APIVersion = "decisiongateway.dev/v1alpha1"
-	Kind       = "Decision"
-)
+const SchemaVersion = "v1alpha1"
 
 type Definition struct {
-	APIVersion string   `yaml:"apiVersion" json:"apiVersion"`
-	Kind       string   `yaml:"kind" json:"kind"`
-	Metadata   Metadata `yaml:"metadata" json:"metadata"`
-	Spec       Spec     `yaml:"spec" json:"spec"`
+	SchemaVersion string   `yaml:"schemaVersion" json:"schemaVersion"`
+	Metadata      Metadata `yaml:"metadata" json:"metadata"`
+	Spec          Spec     `yaml:"spec" json:"spec"`
 }
 
 type Metadata struct {
@@ -64,11 +60,8 @@ type Schema struct {
 }
 
 func (d *Definition) Validate() error {
-	if d.APIVersion != APIVersion {
-		return fmt.Errorf("apiVersion must be %q", APIVersion)
-	}
-	if d.Kind != Kind {
-		return fmt.Errorf("kind must be %q", Kind)
+	if d.SchemaVersion != SchemaVersion {
+		return fmt.Errorf("schemaVersion must be %q", SchemaVersion)
 	}
 	if strings.TrimSpace(d.Metadata.Name) == "" || strings.Contains(d.Metadata.Name, "/") {
 		return fmt.Errorf("metadata.name must be nonempty and cannot contain '/'")
