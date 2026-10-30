@@ -51,7 +51,7 @@ Do not commit real credentials.
 
 ## Image selection
 
-The base uses `ghcr.io/mvaldes14/decision-gateway:latest`. Pin a release or commit image in `kustomization.yaml`:
+The base uses the versioned GHCR image `ghcr.io/mvaldes14/decision-gateway:v0.1.0`. Change the release or pin a commit image in `kustomization.yaml`:
 
 ```yaml
 images:
