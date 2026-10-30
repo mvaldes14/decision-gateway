@@ -82,18 +82,53 @@ func TestSystemOneOmitsOptionalModelAndAuthorization(t *testing.T) {
 }
 
 func TestSystemOneHTTPError(t *testing.T) {
+	tests := []struct {
+		status int
+		kind   ErrorKind
+	}{
+		{http.StatusUnauthorized, ErrorAuthentication},
+		{http.StatusTooManyRequests, ErrorRateLimited},
+		{http.StatusBadRequest, ErrorRequest},
+		{http.StatusGatewayTimeout, ErrorTimeout},
+		{http.StatusServiceUnavailable, ErrorUnavailable},
+	}
+	for _, test := range tests {
+		t.Run(http.StatusText(test.status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(test.status)
+				_, _ = w.Write([]byte(`{"error":"upstream failure"}`))
+			}))
+			defer server.Close()
+
+			adapter, err := NewSystemOne(SystemOneConfig{Name: "clef", BaseURL: server.URL})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = adapter.Execute(context.Background(), Request{})
+			if err == nil || Kind(err) != test.kind || StatusCode(err) != test.status {
+				t.Fatalf("error = %v, kind = %q, status = %d", err, Kind(err), StatusCode(err))
+			}
+			providerError, ok := err.(*Error)
+			if !ok || providerError.Provider != "clef" {
+				t.Fatalf("error = %#v", err)
+			}
+		})
+	}
+}
+
+func TestSystemOneInvalidResponseError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte(`{"error":"invalid API key"}`))
+		_, _ = w.Write([]byte(`not-json`))
 	}))
 	defer server.Close()
 
-	adapter, err := NewSystemOne(SystemOneConfig{Name: "clef", BaseURL: server.URL})
+	adapter, err := NewSystemOne(SystemOneConfig{Name: "laya", BaseURL: server.URL})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := adapter.Execute(context.Background(), Request{}); err == nil || err.Error() != "clef returned HTTP 401: invalid API key" {
-		t.Fatalf("error = %v", err)
+	_, err = adapter.Execute(context.Background(), Request{})
+	if err == nil || Kind(err) != ErrorInvalidResponse || StatusCode(err) != http.StatusOK {
+		t.Fatalf("error = %v, kind = %q, status = %d", err, Kind(err), StatusCode(err))
 	}
 }
 

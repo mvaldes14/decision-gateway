@@ -5,9 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/mvaldes14/decision-gateway/internal/definition"
 	"github.com/mvaldes14/decision-gateway/internal/provider"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 type ErrorKind string
@@ -25,6 +29,17 @@ type ExecutionError struct {
 func (e *ExecutionError) Error() string { return e.Err.Error() }
 func (e *ExecutionError) Unwrap() error { return e.Err }
 
+type FallbackError struct {
+	Primary  error
+	Fallback error
+}
+
+func (e *FallbackError) Error() string {
+	return fmt.Sprintf("primary failed: %v; fallback failed: %v", e.Primary, e.Fallback)
+}
+
+func (e *FallbackError) Unwrap() []error { return []error{e.Primary, e.Fallback} }
+
 type Result struct {
 	Choices      map[string]string
 	Scores       map[string]map[string]float64
@@ -40,7 +55,41 @@ func New(providers *provider.Set) *Engine {
 	return &Engine{providers: providers}
 }
 
-func (e *Engine) Execute(ctx context.Context, decision *definition.Definition, input map[string]any) (Result, error) {
+func (e *Engine) ValidateRoutes(definitions []*definition.Definition) error {
+	unavailable := make([]string, 0)
+	for _, decision := range definitions {
+		primaryAvailable := e.providers.Has(decision.Spec.Routing.Primary)
+		fallbackAvailable := decision.Spec.Routing.Fallback != "" && e.providers.Has(decision.Spec.Routing.Fallback)
+		if !primaryAvailable && !fallbackAvailable {
+			unavailable = append(unavailable, fmt.Sprintf("%s/%s", decision.Metadata.Name, decision.Metadata.Version))
+		}
+	}
+	if len(unavailable) > 0 {
+		return fmt.Errorf("no configured provider available for decisions: %s", strings.Join(unavailable, ", "))
+	}
+	return nil
+}
+
+func (e *Engine) Execute(ctx context.Context, decision *definition.Definition, input map[string]any) (result Result, executeErr error) {
+	ctx, span := otel.Tracer("github.com/mvaldes14/decision-gateway/internal/engine").Start(ctx, "decision.execute")
+	span.SetAttributes(
+		attribute.String("decision.name", decision.Metadata.Name),
+		attribute.String("decision.version", decision.Metadata.Version),
+		attribute.String("decision.provider.primary", decision.Spec.Routing.Primary),
+	)
+	defer func() {
+		if executeErr != nil {
+			span.RecordError(executeErr)
+			span.SetStatus(codes.Error, executeErr.Error())
+		} else {
+			span.SetAttributes(
+				attribute.String("decision.provider.used", result.Provider),
+				attribute.Bool("decision.fallback.used", result.FallbackUsed),
+			)
+		}
+		span.End()
+	}()
+
 	ctx, cancel := context.WithTimeout(ctx, decision.Timeout())
 	defer cancel()
 
@@ -61,7 +110,7 @@ func (e *Engine) Execute(ctx context.Context, decision *definition.Definition, i
 		if ctx.Err() != nil {
 			return Result{}, &ExecutionError{Kind: ErrorTimeout, Err: ctx.Err()}
 		}
-		return Result{}, &ExecutionError{Kind: ErrorProvider, Err: fmt.Errorf("primary failed: %v; fallback failed: %w", err, fallbackErr)}
+		return Result{}, &ExecutionError{Kind: ErrorProvider, Err: &FallbackError{Primary: err, Fallback: fallbackErr}}
 	}
 	fallbackResult.FallbackUsed = true
 	return fallbackResult, nil
@@ -77,7 +126,7 @@ func (e *Engine) execute(ctx context.Context, decision *definition.Definition, n
 		return Result{}, err
 	}
 	if err := validateResult(decision, value); err != nil {
-		return Result{}, err
+		return Result{}, provider.NewError(adapter.Name(), provider.ErrorInvalidResponse, 0, err)
 	}
 	return Result{Choices: value.Choices, Scores: value.Scores, Provider: adapter.Name()}, nil
 }

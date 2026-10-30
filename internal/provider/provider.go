@@ -38,10 +38,15 @@ func NewSet(providers ...Provider) *Set {
 	return set
 }
 
+func (s *Set) Has(name string) bool {
+	_, ok := s.providers[name]
+	return ok
+}
+
 func (s *Set) Get(name string) (Provider, error) {
 	value, ok := s.providers[name]
 	if !ok {
-		return nil, fmt.Errorf("provider %q is not configured", name)
+		return nil, NewError(name, ErrorUnavailable, 0, fmt.Errorf("provider %q is not configured", name))
 	}
 	return value, nil
 }

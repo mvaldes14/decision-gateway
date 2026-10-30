@@ -13,7 +13,10 @@ import (
 
 	"github.com/mvaldes14/decision-gateway/internal/definition"
 	"github.com/mvaldes14/decision-gateway/internal/engine"
+	"github.com/mvaldes14/decision-gateway/internal/provider"
 	"github.com/mvaldes14/decision-gateway/internal/registry"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type requestIDKey struct{}
@@ -60,14 +63,21 @@ func New(registry *registry.Registry, executionEngine *engine.Engine, maxBodyByt
 	mux.HandleFunc("GET /readyz", server.ready)
 	mux.HandleFunc("GET /v1/decisions", server.list)
 	mux.HandleFunc("/v1/decisions/", server.decision)
-	return server.requestIDs(mux)
+	handler := server.requestIDs(mux)
+	return otelhttp.NewHandler(handler, "decision-gateway.http", otelhttp.WithFilter(func(r *http.Request) bool {
+		return r.URL.Path != "/healthz" && r.URL.Path != "/readyz"
+	}))
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (s *Server) ready(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
+	if err := s.engine.ValidateRoutes(s.registry.All()); err != nil {
+		s.writeError(w, r, http.StatusServiceUnavailable, "NOT_READY", err.Error())
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
 
@@ -166,7 +176,17 @@ func (s *Server) execute(w http.ResponseWriter, r *http.Request, value *definiti
 			s.writeError(w, r, http.StatusGatewayTimeout, "PROVIDER_TIMEOUT", "execution exceeded timeout")
 			return
 		}
-		s.logger.Warn("decision execution failed", "request_id", requestID(r.Context()), "decision", value.Metadata.Name, "version", value.Metadata.Version, "error", err)
+		spanContext := trace.SpanContextFromContext(r.Context())
+		s.logger.Warn("decision execution failed",
+			"request_id", requestID(r.Context()),
+			"trace_id", spanContext.TraceID().String(),
+			"span_id", spanContext.SpanID().String(),
+			"decision", value.Metadata.Name,
+			"version", value.Metadata.Version,
+			"provider_error_kind", provider.Kind(err),
+			"provider_status_code", provider.StatusCode(err),
+			"error", err,
+		)
 		s.writeError(w, r, http.StatusBadGateway, "PROVIDER_ERROR", "no provider returned a valid result")
 		return
 	}

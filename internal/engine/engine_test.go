@@ -37,8 +37,20 @@ func TestRejectsUnknownChoice(t *testing.T) {
 	decision := testDecision()
 	invalid := fakeProvider{name: "primary", result: provider.Result{Choices: map[string]string{"label": "maybe"}}}
 	_, err := New(provider.NewSet(invalid)).Execute(context.Background(), decision, nil)
-	if err == nil || Kind(err) != ErrorProvider {
-		t.Fatalf("error = %v", err)
+	if err == nil || Kind(err) != ErrorProvider || provider.Kind(err) != provider.ErrorInvalidResponse {
+		t.Fatalf("error = %v, engine kind = %q, provider kind = %q", err, Kind(err), provider.Kind(err))
+	}
+}
+
+func TestValidateRoutes(t *testing.T) {
+	decision := testDecision()
+	if err := New(provider.NewSet()).ValidateRoutes([]*definition.Definition{decision}); err == nil {
+		t.Fatal("expected unavailable route error")
+	}
+
+	fallback := fakeProvider{name: "fallback"}
+	if err := New(provider.NewSet(fallback)).ValidateRoutes([]*definition.Definition{decision}); err != nil {
+		t.Fatalf("fallback route should be available: %v", err)
 	}
 }
 

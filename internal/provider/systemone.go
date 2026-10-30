@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 const (
@@ -75,12 +77,18 @@ func NewSystemOne(config SystemOneConfig) (Provider, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
+	clientCopy := *client
+	transport := client.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	clientCopy.Transport = otelhttp.NewTransport(transport)
 	return &systemOneProvider{
 		name:     config.Name,
 		endpoint: strings.TrimRight(parsed.String(), "/") + "/v1/systemone",
 		apiKey:   config.APIKey,
 		model:    config.Model,
-		client:   client,
+		client:   &clientCopy,
 	}, nil
 }
 
@@ -97,12 +105,12 @@ func (p *systemOneProvider) Execute(ctx context.Context, request Request) (Resul
 	}
 	payload, err := json.Marshal(systemOneRequest{Model: p.model, State: request.Input, Questions: questions})
 	if err != nil {
-		return Result{}, fmt.Errorf("encode %s request: %w", p.name, err)
+		return Result{}, NewError(p.name, ErrorRequest, 0, fmt.Errorf("encode %s request: %w", p.name, err))
 	}
 
 	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return Result{}, fmt.Errorf("create %s request: %w", p.name, err)
+		return Result{}, NewError(p.name, ErrorRequest, 0, fmt.Errorf("create %s request: %w", p.name, err))
 	}
 	httpRequest.Header.Set("Content-Type", "application/json")
 	httpRequest.Header.Set("Accept", "application/json")
@@ -112,7 +120,11 @@ func (p *systemOneProvider) Execute(ctx context.Context, request Request) (Resul
 
 	response, err := p.client.Do(httpRequest)
 	if err != nil {
-		return Result{}, fmt.Errorf("call %s: %w", p.name, err)
+		kind := ErrorUnavailable
+		if errors.Is(err, context.DeadlineExceeded) {
+			kind = ErrorTimeout
+		}
+		return Result{}, NewError(p.name, kind, 0, fmt.Errorf("call %s: %w", p.name, err))
 	}
 	defer response.Body.Close()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
@@ -122,7 +134,7 @@ func (p *systemOneProvider) Execute(ctx context.Context, request Request) (Resul
 	var decoded systemOneResponse
 	decoder := json.NewDecoder(io.LimitReader(response.Body, maxResponseBodyBytes))
 	if err := decoder.Decode(&decoded); err != nil {
-		return Result{}, fmt.Errorf("decode %s response: %w", p.name, err)
+		return Result{}, NewError(p.name, ErrorInvalidResponse, response.StatusCode, fmt.Errorf("decode %s response: %w", p.name, err))
 	}
 
 	result := Result{
@@ -131,10 +143,10 @@ func (p *systemOneProvider) Execute(ctx context.Context, request Request) (Resul
 	}
 	for name, answer := range decoded.Answers {
 		if answer.Type != "choice" {
-			return Result{}, fmt.Errorf("%s returned unsupported answer type %q for %q", p.name, answer.Type, name)
+			return Result{}, NewError(p.name, ErrorInvalidResponse, response.StatusCode, fmt.Errorf("%s returned unsupported answer type %q for %q", p.name, answer.Type, name))
 		}
 		if answer.Choice == "" {
-			return Result{}, fmt.Errorf("%s returned empty choice for %q", p.name, name)
+			return Result{}, NewError(p.name, ErrorInvalidResponse, response.StatusCode, fmt.Errorf("%s returned empty choice for %q", p.name, name))
 		}
 		result.Choices[name] = answer.Choice
 		if len(answer.Probabilities) > 0 {
@@ -147,8 +159,25 @@ func (p *systemOneProvider) Execute(ctx context.Context, request Request) (Resul
 func providerHTTPError(name string, response *http.Response) error {
 	body, _ := io.ReadAll(io.LimitReader(response.Body, maxErrorBodyBytes))
 	var envelope systemOneError
+	message := fmt.Errorf("%s returned HTTP %d", name, response.StatusCode)
 	if json.Unmarshal(body, &envelope) == nil && envelope.Error != "" {
-		return fmt.Errorf("%s returned HTTP %d: %s", name, response.StatusCode, envelope.Error)
+		message = fmt.Errorf("%s returned HTTP %d: %s", name, response.StatusCode, envelope.Error)
 	}
-	return fmt.Errorf("%s returned HTTP %d", name, response.StatusCode)
+	return NewError(name, httpErrorKind(response.StatusCode), response.StatusCode, message)
+}
+
+func httpErrorKind(statusCode int) ErrorKind {
+	switch statusCode {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return ErrorAuthentication
+	case http.StatusRequestTimeout, http.StatusGatewayTimeout:
+		return ErrorTimeout
+	case http.StatusTooManyRequests:
+		return ErrorRateLimited
+	default:
+		if statusCode >= http.StatusBadRequest && statusCode < http.StatusInternalServerError {
+			return ErrorRequest
+		}
+		return ErrorUnavailable
+	}
 }

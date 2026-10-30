@@ -54,6 +54,7 @@ func TestEndpoints(t *testing.T) {
 		code   string
 	}{
 		{http.MethodGet, "/healthz", "", http.StatusOK, `"status":"ok"`},
+		{http.MethodGet, "/readyz", "", http.StatusServiceUnavailable, `"NOT_READY"`},
 		{http.MethodGet, "/v1/decisions", "", http.StatusOK, `"name":"test"`},
 		{http.MethodGet, "/v1/decisions/test/versions/v1", "", http.StatusOK, `"input_schema"`},
 		{http.MethodPost, "/v1/decisions/test/versions/v1:execute", `{}`, http.StatusUnprocessableEntity, `"INVALID_INPUT"`},

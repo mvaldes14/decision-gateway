@@ -17,5 +17,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - run: go test -race ./...
+      - run: go mod tidy -go=1.24.0
+      - run: git diff --exit-code -- go.mod go.sum
+      - run: go test -race -coverprofile=coverage.txt ./...
       - run: go vet ./...
+      - run: go build -trimpath ./cmd/decision-gateway
+      - run: docker build -t decision-gateway:ci .

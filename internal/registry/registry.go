@@ -94,6 +94,22 @@ func (r *Registry) Get(name, version string) (*definition.Definition, error) {
 	return value, nil
 }
 
+func (r *Registry) All() []*definition.Definition {
+	values := make([]*definition.Definition, 0)
+	for _, versions := range r.definitions {
+		for _, value := range versions {
+			values = append(values, value)
+		}
+	}
+	sort.Slice(values, func(i, j int) bool {
+		if values[i].Metadata.Name == values[j].Metadata.Name {
+			return values[i].Metadata.Version < values[j].Metadata.Version
+		}
+		return values[i].Metadata.Name < values[j].Metadata.Name
+	})
+	return values
+}
+
 func (r *Registry) List() []Summary {
 	names := make([]string, 0, len(r.definitions))
 	for name := range r.definitions {

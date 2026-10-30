@@ -49,6 +49,14 @@ metadata:
   name: decision-gateway
 spec:
   replicas: 2
+  minReadySeconds: 5
+  revisionHistoryLimit: 3
+  progressDeadlineSeconds: 300
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: decision-gateway
@@ -57,14 +65,20 @@ spec:
       labels:
         app.kubernetes.io/name: decision-gateway
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
       securityContext:
         runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: decision-gateway
           image: ghcr.io/mvaldes14/decision-gateway:latest
           env:
+            - name: OTEL_SERVICE_NAME
+              value: decision-gateway
             - name: DG_DEFINITIONS_DIR
               value: /etc/decision-gateway/decisions
             - name: DG_LAYA_BASE_URL
@@ -88,13 +102,23 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 2
+            failureThreshold: 15
           readinessProbe:
             httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
           livenessProbe:
             httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
           resources:
             requests: {cpu: 20m, memory: 32Mi}
-            limits: {memory: 128Mi}
+            limits: {cpu: 500m, memory: 128Mi}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}
@@ -107,6 +131,16 @@ spec:
         - name: definitions
           configMap:
             name: decision-gateway-definitions
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: decision-gateway
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: decision-gateway
 ---
 apiVersion: v1
 kind: Service

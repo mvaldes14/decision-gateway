@@ -15,6 +15,13 @@ import (
 	"github.com/mvaldes14/decision-gateway/internal/engine"
 	"github.com/mvaldes14/decision-gateway/internal/provider"
 	"github.com/mvaldes14/decision-gateway/internal/registry"
+	"github.com/mvaldes14/decision-gateway/internal/telemetry"
+)
+
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildDate = "unknown"
 )
 
 func main() {
@@ -30,6 +37,18 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	shutdownTelemetry, telemetryEnabled, err := telemetry.Setup(context.Background(), version, logger)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTelemetry(shutdownCtx); err != nil {
+			logger.Error("OpenTelemetry shutdown failed", "error", err)
+		}
+	}()
+
 	definitions, err := registry.Load(cfg.DefinitionsDir)
 	if err != nil {
 		return err
@@ -41,6 +60,9 @@ func run(logger *slog.Logger) error {
 	}
 	providers := provider.NewSet(configuredProviders...)
 	executionEngine := engine.New(providers)
+	if err := executionEngine.ValidateRoutes(definitions.All()); err != nil {
+		return err
+	}
 	handler := api.New(definitions, executionEngine, cfg.MaxBodyBytes, cfg.MaxConcurrent, logger)
 	server := &http.Server{
 		Addr: cfg.ListenAddr, Handler: handler,
@@ -61,7 +83,15 @@ func run(logger *slog.Logger) error {
 		}
 	}()
 
-	logger.Info("starting decision gateway", "address", cfg.ListenAddr, "definitions", cfg.DefinitionsDir, "providers", providerNames(configuredProviders))
+	logger.Info("starting decision gateway",
+		"address", cfg.ListenAddr,
+		"definitions", cfg.DefinitionsDir,
+		"providers", providerNames(configuredProviders),
+		"telemetry", telemetryEnabled,
+		"version", version,
+		"commit", commit,
+		"build_date", buildDate,
+	)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
