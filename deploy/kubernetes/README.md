@@ -51,12 +51,12 @@ Do not commit real credentials.
 
 ## Image selection
 
-The base uses the versioned GHCR image `ghcr.io/mvaldes14/decision-gateway:v0.1.0`. Change the release or pin a commit image in `kustomization.yaml`:
+The base uses the versioned GHCR image `ghcr.io/mvaldes14/decision-gateway:v0.1.1`. Change the release or pin a commit image in `kustomization.yaml`:
 
 ```yaml
 images:
   - name: ghcr.io/mvaldes14/decision-gateway
-    newTag: v0.1.0
+    newTag: v0.1.1
 ```
 
 For GitOps, override the image in an overlay instead of modifying the base.
@@ -94,7 +94,7 @@ patches:
   - path: deployment-patch.yaml
 images:
   - name: ghcr.io/mvaldes14/decision-gateway
-    newTag: v0.1.0
+    newTag: v0.1.1
 ```
 
 ```yaml
