@@ -9,6 +9,8 @@ Place one definition per `.yaml` or `.yml` file in `DG_DEFINITIONS_DIR`:
 
 Definitions load once during startup. Add or change a file, then restart the gateway. Any malformed definition or decision without an available primary/fallback provider stops startup.
 
+Decision definitions are application configuration, not Kubernetes resources or CRDs. `schemaVersion` versions the Decision Gateway file format.
+
 ## Endpoint generation
 
 For this metadata:
@@ -36,8 +38,7 @@ Use a new version such as `v2` for contract changes after clients consume a vers
 Create `decisions/incident-triage.yaml`:
 
 ```yaml
-apiVersion: decisiongateway.dev/v1alpha1
-kind: Decision
+schemaVersion: v1alpha1
 metadata:
   name: incident-triage
   version: v1
