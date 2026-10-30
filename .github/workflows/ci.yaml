@@ -17,6 +17,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - uses: azure/setup-kubectl@v4
+      - run: kubectl kustomize deploy/kubernetes >/dev/null
       - run: go mod tidy -go=1.24.0
       - run: git diff --exit-code -- go.mod go.sum
       - run: go test -race -coverprofile=coverage.txt ./...

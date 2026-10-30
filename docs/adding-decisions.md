@@ -206,9 +206,17 @@ docker compose up -d --build --force-recreate
 
 ### Kubernetes
 
-Add another key under the `decision-gateway-definitions` ConfigMap in `deploy/kubernetes/decision-gateway.yaml`, or replace that ConfigMap with your GitOps-managed definitions. The ConfigMap volume projects every key into the definitions directory.
+Add another key under the `decision-gateway-definitions` ConfigMap in `deploy/kubernetes/configmap.yaml`, or patch/replace that resource from a Kustomize overlay. The ConfigMap volume projects every key into the definitions directory.
 
-Restart pods after changing definitions:
+Render and apply the manifests:
+
+```sh
+kubectl kustomize deploy/kubernetes
+kubectl apply -k deploy/kubernetes
+kubectl rollout status deployment/decision-gateway
+```
+
+The registry loads definitions only at process startup. After changing the ConfigMap, restart the pods unless an overlay or GitOps controller already changed the pod template and triggered a rollout:
 
 ```sh
 kubectl rollout restart deployment/decision-gateway

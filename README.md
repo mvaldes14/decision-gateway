@@ -107,6 +107,17 @@ Each YAML definition automatically creates describe and execute endpoints from `
 
 See [`docs/adding-decisions.md`](docs/adding-decisions.md) for a complete example, supported input schema, question/option guidance, versioning, routing, Docker Compose, and Kubernetes deployment steps.
 
+## Kubernetes
+
+Kubernetes resources are split by concern and assembled with Kustomize:
+
+```sh
+kubectl kustomize deploy/kubernetes
+kubectl apply -k deploy/kubernetes
+```
+
+See [`deploy/kubernetes/README.md`](deploy/kubernetes/README.md) for provider secrets, image pinning, decision ConfigMaps, and environment overlays.
+
 ## Configuration
 
 | Variable | Default | Purpose |
