@@ -9,19 +9,26 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  go:
+    permissions:
+      contents: read
+    uses: mvaldes14/gh-actions/.github/workflows/go-ci.yml@main
+    with:
+      lint: false
+
+  manifests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
       - uses: azure/setup-kubectl@v4
       - run: kubectl kustomize deploy/kubernetes >/dev/null
-      - run: go mod tidy -go=1.24.0
-      - run: git diff --exit-code -- go.mod go.sum
-      - run: go test -race -coverprofile=coverage.txt ./...
-      - run: go vet ./...
-      - run: go build -trimpath ./cmd/decision-gateway
-      - run: docker build -t decision-gateway:ci .
+
+  container:
+    permissions:
+      contents: read
+      packages: write
+    uses: mvaldes14/gh-actions/.github/workflows/docker-build-push.yml@main
+    with:
+      image: mvaldes14/decision-gateway
+      push: false
+      cache-scope: decision-gateway-ci
